@@ -20,7 +20,7 @@ cuda = torch.cuda.is_available()
 text = utils.read_prose_lines(os.path.abspath(args.file))
 corpora_length = len(text)
 
-rnn = ESN(101, 101, r_size=300, spectral_radius=2.5)
+rnn = ESN(101, 101, r_size=100, spectral_radius=2.5)
 
 if cuda:
     rnn = rnn.cuda()
@@ -28,7 +28,7 @@ if cuda:
 for param in rnn.parameters():
     param.requires_grad = False
 
-for param in rnn.fc.parameters():
+for param in rnn.W_out.parameters():
     param.requires_grad = True
 
 criterion = nn.CrossEntropyLoss()
@@ -37,7 +37,6 @@ scheduler = lr_scheduler.StepLR(optimizer, step_size=1, gamma=0.9999)
 
 def train(input_line_tensor, target_line_tensor):
     rnn.train()
-    assert target_line_tensor.data[-1] == N_LETTERS - 1
     hidden  = rnn.init_hidden()
     if cuda:
         hidden = hidden.cuda()
@@ -46,17 +45,15 @@ def train(input_line_tensor, target_line_tensor):
 
     rnn.zero_grad()
 
-    total_loss = 0
+    loss = 0
     for i in range(target_line_tensor.size()[0]):
-        output, hidden = rnn(input_line_tensor[i], hidden)
-        loss = criterion(output, target_line_tensor[i])
+        output, hidden = rnn(input_line_tensor[i][0], hidden)
+        loss += criterion(output, target_line_tensor[i])
         
-        loss.backward()
-        optimizer.step()
-
-        total_loss += loss.data.mean()
+    loss.backward()
+    optimizer.step()
     
-    return output, total_loss / input_line_tensor.size()[0]
+    return output, loss.data.mean() / input_line_tensor.size()[0]
 
 
 def sample(start_letters="abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ", max_length=100):
@@ -74,7 +71,7 @@ def sample(start_letters="abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ",
         if cuda:
             input = input.cuda()
 
-        output, hidden = rnn(input[0], hidden)
+        output, hidden = rnn(input[0][0], hidden)
         topv, topi = output.data.topk(1)
         topi = topi[0][0]
         if topi == N_LETTERS - 1:
