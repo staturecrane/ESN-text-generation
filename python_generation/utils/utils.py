@@ -23,6 +23,13 @@ def read_lines(filename):
     return [unicode_to_ascii(line) for line in program]
 
 
+def read_prose_lines(filename):
+    text = open(filename).read().split('.')
+    only_long = filter(lambda line: len(line) > 10, text)
+    stripped = [line.strip() for line in only_long]
+    return [unicode_to_ascii(line) for line in stripped]
+
+
 def random_choice(l):
     return l[random.randint(0, len(l) - 1)]
 
@@ -44,8 +51,7 @@ def create_target_tensor(line):
     return torch.LongTensor(letter_indexes)
 
 
-def random_training_set(lines, sample_length=500):
-    line = random_choice(lines)
+def random_training_set(line, sample_length=500):
     length = sample_length if len(line) > sample_length else len(line)
     if length > sample_length:
         random_idx = torch.randint(0, length - sample_length - 1)
