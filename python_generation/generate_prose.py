@@ -20,7 +20,7 @@ cuda = torch.cuda.is_available()
 text = utils.read_prose_lines(os.path.abspath(args.file))
 corpora_length = len(text)
 
-hidden_size = 500
+hidden_size = 200
 
 rnn = ESN(101, 101, r_size=hidden_size, spectral_radius=1.0)
 out = nn.Linear(hidden_size * hidden_size, 101)
