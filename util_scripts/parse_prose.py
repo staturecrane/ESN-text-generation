@@ -16,9 +16,9 @@ args = parser.parse_args()
 
 def main(filename, output_filename):
     with open(os.path.abspath(filename)) as text_file:
-        lines = text_file.readlines()
-        new_lines = map(lambda line: line.replace('\n', ' '), lines)
-        stripped = filter(lambda line: line != ' ', list(new_lines))
+        lines = text_file.read()
+        # new_lines = map(lambda line: line.replace('\n', ' '), lines)
+        stripped = filter(lambda line: line != ' ', lines)
         joined = ''.join(list(stripped))
         
         with open(os.path.abspath(output_filename), 'w') as newfile:

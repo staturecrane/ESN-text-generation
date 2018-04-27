@@ -3,7 +3,7 @@ import os
 import random
 
 from config import ALL_LETTERS, N_LETTERS
-import numpy as n
+import numpy as np
 from python_generation import ESN, utils
 import torch
 from torch.autograd import Variable
@@ -20,24 +20,25 @@ cuda = torch.cuda.is_available()
 text = utils.read_prose_lines(os.path.abspath(args.file))
 corpora_length = len(text)
 
-rnn = ESN(101, 101, r_size=100, spectral_radius=2.5)
+hidden_size = 500
+
+rnn = ESN(101, 101, r_size=hidden_size, spectral_radius=1.0)
+out = nn.Linear(hidden_size * hidden_size, 101)
 
 if cuda:
     rnn = rnn.cuda()
+    out = out.cuda()
 
 for param in rnn.parameters():
     param.requires_grad = False
 
-for param in rnn.W_out.parameters():
-    param.requires_grad = True
-
 criterion = nn.CrossEntropyLoss()
-optimizer = torch.optim.SGD(filter(lambda param: param.requires_grad, rnn.parameters()), lr=1e-3, momentum=0.9)
-scheduler = lr_scheduler.StepLR(optimizer, step_size=1, gamma=0.9999)
+optimizer = torch.optim.Adam(out.parameters(), lr=0.0001)
+scheduler = lr_scheduler.StepLR(optimizer, step_size=50, gamma=0.999)
 
 def train(input_line_tensor, target_line_tensor):
     rnn.train()
-    hidden  = rnn.init_hidden()
+    hidden = rnn.init_hidden()
     if cuda:
         hidden = hidden.cuda()
         input_line_tensor = input_line_tensor.cuda()
@@ -45,19 +46,31 @@ def train(input_line_tensor, target_line_tensor):
 
     rnn.zero_grad()
 
-    loss = 0
+    states = []
     for i in range(target_line_tensor.size()[0]):
-        output, hidden = rnn(input_line_tensor[i][0], hidden)
-        loss += criterion(output, target_line_tensor[i])
-        
-    loss.backward()
-    optimizer.step()
-    
-    return output, loss.data.mean() / input_line_tensor.size()[0]
+        hidden = rnn(input_line_tensor[i][0], hidden)
+        states.append((hidden, target_line_tensor[i]))
+
+    # randomize for better diversity
+    idxs = list(range(target_line_tensor.size()[0]))
+    random.shuffle(idxs)
+    total_loss = 0
+    for i in idxs:
+        output = out(states[i][0].view(-1).unsqueeze(0))
+        loss = criterion(output, states[i][1])
+
+        loss.backward()
+        optimizer.step()
+
+        total_loss += loss.data[0]
+
+    return output, total_loss / input_line_tensor.size()[0]
 
 
-def sample(start_letters="abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ", max_length=100):
+def sample(start_letters='ABCDEFGHIJKLMNOPQRSTUVWXYZ"', max_length=250):
     rnn.eval()
+    out.eval()
+
     start_letter = start_letters[random.randint(0, len(start_letters) - 1)]
     input = Variable(utils.create_input_tensor(start_letter))
     hidden = rnn.init_hidden()
@@ -71,9 +84,12 @@ def sample(start_letters="abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ",
         if cuda:
             input = input.cuda()
 
-        output, hidden = rnn(input[0][0], hidden)
-        topv, topi = output.data.topk(1)
-        topi = topi[0][0]
+        hidden = rnn(input[0][0], hidden)
+
+        output = out(hidden.view(-1)).unsqueeze(0)
+        predictions = nn.Softmax()(output).data[0]
+        topi = np.argmax(predictions)
+
         if topi == N_LETTERS - 1:
             break
         else:
@@ -87,16 +103,18 @@ n_epochs = 200000
 print_every = 100
 sample_every = 100
 save_every = 1000
+sample_length = 50
 
 for epoch in tqdm(range(1, n_epochs)):
     random_idx = random.randint(0, corpora_length - 1)
-    output, loss = train(*utils.random_training_set(text[random_idx], sample_length=50))
-    scheduler.step()
+    output, loss = train(*utils.random_training_set(text[random_idx], sample_length=sample_length))
+    
+    # scheduler.step()
     if epoch % print_every == 0:
         print("epoch {}: {}".format(epoch, loss))
 
     if epoch % sample_every == 0:
-        print(sample())
+        print(sample(max_length=50))
 
     """
     if epoch % save_every == 0:
