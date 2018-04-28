@@ -41,5 +41,5 @@ class ESN(nn.Module):
         x_in = self.W_in.mv(input_tensor)
         x_W = self.W.mm(prev_hidden)
         update = self.tanh(x_in + x_W)
-        
-        return update 
+     
+        return update

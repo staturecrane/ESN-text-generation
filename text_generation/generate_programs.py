@@ -4,7 +4,7 @@ import random
 
 from config import ALL_LETTERS, N_LETTERS
 import numpy as n
-from python_generation import ESN, utils
+from text_generation import ESN, utils
 import torch
 from torch.autograd import Variable
 import torch.nn as nn

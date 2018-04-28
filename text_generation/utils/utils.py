@@ -3,7 +3,7 @@ import random
 import time
 import math
 
-from python_generation.config import ALL_LETTERS, N_LETTERS, SAMPLE_LENGTH
+from text_generation.config import ALL_LETTERS, N_LETTERS, SAMPLE_LENGTH
 import torch
 from torch.autograd import Variable
 
@@ -51,12 +51,12 @@ def create_target_tensor(line):
     return torch.LongTensor(letter_indexes)
 
 
-def random_training_set(line, sample_length=500):
+def random_training_set(line, sample_length=500, volatile=False):
     length = sample_length if len(line) > sample_length else len(line)
     if length > sample_length:
         random_idx = torch.randint(0, length - sample_length - 1)
         line = line[random_idx : random_idx + sample_length + 1]
-    input_line_tensor = Variable(create_input_tensor(line))
-    target_line_tensor = Variable(create_target_tensor(line))
+    input_line_tensor = Variable(create_input_tensor(line), volatile=volatile)
+    target_line_tensor = Variable(create_target_tensor(line), volatile=volatile)
 
     return input_line_tensor, target_line_tensor
